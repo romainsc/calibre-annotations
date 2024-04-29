@@ -8,7 +8,7 @@ __license__ = 'GPL v3'
 __copyright__ = '2013, Greg Riker <griker@hotmail.com>, 2014-2020 additions by David Forrester <davidfor@internode.on.net>'
 __docformat__ = 'restructuredtext en'
 
-import imp, inspect, os, re, sys, tempfile, threading, types
+import importlib, inspect, os, re, sys, tempfile, threading, types
 
 # calibre Python 3 compatibility.
 try:
@@ -877,7 +877,15 @@ class AnnotationsAction(InterfaceAction, Logger):
         self.library_indexed = True
         self.indexed_library = self.gui.current_db
         self.library_last_modified = self.gui.current_db.last_modified()
-
+    
+    def load_module(self, module_name, filename):
+        loader = importlib.machinery.SourceFileLoader(module_name, filename)
+        module = types.ModuleType(loader.name)
+        module.__file__ = filename
+        sys.modules[module.__name__] = module
+        loader.exec_module(module)
+        return module
+    
     def load_dynamic_reader_classes(self):
         '''
         Load reader classes dynamically from readers/ folder in plugin zip file
@@ -900,7 +908,7 @@ class AnnotationsAction(InterfaceAction, Logger):
             with open(tmp_file, 'wb') as tf:
                 tf.write(get_resources(rac))
             self._log(" loading built-in class '%s'" % name)
-            imp.load_source(name, tmp_file)
+            self.load_module(name, tmp_file)
             os.remove(tmp_file)
 
         # Load locally defined classes specified in config file
@@ -916,7 +924,7 @@ class AnnotationsAction(InterfaceAction, Logger):
                     name = re.sub('_', '', name)
                     self._log(" loading external class '%s'" % name)
                     try:
-                        imp.load_source(name, ac)
+                        self.load_module(name, ac)
                     except:
                         # If additional_class fails to import, exit
                         import traceback
